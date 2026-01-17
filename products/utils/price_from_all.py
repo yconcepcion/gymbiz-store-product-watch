@@ -1,6 +1,5 @@
 from selenium import webdriver
 from selenium.webdriver import ActionChains
-from selenium.webdriver.common.actions.wheel_actions import WheelActions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -13,7 +12,6 @@ import re
 import os
 import datetime
 
-from products.models import Product
 from products.service.product_service import ProductService
 from products.unit.action.update_product import UpdateProductAction
 
