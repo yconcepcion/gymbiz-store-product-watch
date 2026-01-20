@@ -11,6 +11,7 @@ import time
 import re
 import os
 import datetime
+import traceback
 
 from products.service.product_service import ProductService
 from products.unit.action.update_product import UpdateProductAction
@@ -57,9 +58,8 @@ class Price:
         }
         chrome_options.add_experimental_option("prefs", prefs)
         chrome_options.add_argument(f'user-agent={random.choice(user_agents)}')
-        chrome_options.add_argument("--disable-gpu")  # Aceleración por GPU
-        # chrome_options.add_argument("--headless=new")  # Modo sin interfaz para servidores
-        # chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--headless=new")  # Modo sin interfaz para servidores
+        chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-extensions")  # Sin extensiones
         chrome_options.add_argument("--disable-notifications")  # Sin notificaciones
@@ -68,8 +68,6 @@ class Price:
         self.driver = driver
 
         try:
-            set_first_data = True
-
             driver.set_page_load_timeout(300)
             # driver.set_page_load_timeout(30)  # 30 segundos para cargar página
             driver.set_script_timeout(20)  # 20 segundos para scripts JS
@@ -81,6 +79,8 @@ class Price:
 
             service = ProductService()
             for provider in self.providers:
+                set_first_data = True
+
                 products = service.find_all().filter(store_provider_url__startswith=provider.get('provider_url'))
                 for product in products:
                     if product.active:
@@ -96,23 +96,25 @@ class Price:
                         time.sleep(random.uniform(3, 6))
 
         except Exception as e:
+            #timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            #os.makedirs("debug", exist_ok=True)
+            #driver.save_screenshot(f"debug/debug_{timestamp}.png")
             print(f"Ocurrió un error: {e}")
+            traceback.print_exc()
         finally:
             # input()
             driver.quit()
 
     def get_price_from_sedanos(self, url, wait, set_store):
-        driver = self.driver
-
-        driver.get(url)
+        self.driver.get(url)
 
         if set_store:
             wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '.fp-btn-select-store'))
             )
-            element_select_store_click = driver.find_element(By.CSS_SELECTOR, '.fp-btn-select-store')
+            element_select_store_click = self.driver.find_element(By.CSS_SELECTOR, '.fp-btn-select-store')
             print(element_select_store_click.get_attribute("innerText"))
-            ActionChains(driver).scroll_to_element(element_select_store_click).perform()
+            ActionChains(self.driver).scroll_to_element(element_select_store_click).perform()
             wait.until(
                 EC.element_to_be_clickable(element_select_store_click)
             )
@@ -121,18 +123,18 @@ class Price:
             wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '.fp-btn-price.fp-btn-mystore[data-store-id="5735"]'))
             )
-            element_select_store = driver.find_element(By.CSS_SELECTOR, '.fp-btn-price.fp-btn-mystore[data-store-id="5735"]')
+            element_select_store = self.driver.find_element(By.CSS_SELECTOR, '.fp-btn-price.fp-btn-mystore[data-store-id="5735"]')
             if element_select_store.is_displayed():
                 wait.until(
                     EC.presence_of_element_located((By.ID, 'cn-accept-cookie'))
                 )
-                element_cookie_click = driver.find_element(By.ID, 'cn-accept-cookie')
+                element_cookie_click = self.driver.find_element(By.ID, 'cn-accept-cookie')
                 wait.until(
                     EC.element_to_be_clickable(element_cookie_click)
                 )
                 element_cookie_click.click()
 
-                ActionChains(driver).scroll_to_element(element_select_store).perform()
+                ActionChains(self.driver).scroll_to_element(element_select_store).perform()
                 wait.until(
                     EC.element_to_be_clickable(element_select_store)
                 )
@@ -158,13 +160,13 @@ class Price:
             return null;
             """
         wait.until(lambda d: d.execute_script(script_js) is not None)
-        price_text = driver.execute_script(script_js)
+        price_text = self.driver.execute_script(script_js)
         price = self.extract_price_from_text(price_text)
 
         wait.until(
             EC.presence_of_element_located((By.CLASS_NAME, 'fp-item-quantity-on-hand'))
         )
-        element_in_stock = driver.find_element(By.CLASS_NAME, 'fp-item-quantity-on-hand')
+        element_in_stock = self.driver.find_element(By.CLASS_NAME, 'fp-item-quantity-on-hand')
         in_stock = element_in_stock.get_attribute("innerText").strip().upper() == 'In Stock'.upper()
         out_of_stock = not in_stock
 
@@ -174,21 +176,17 @@ class Price:
         price = None
         out_of_stock = False
 
-        driver = self.driver
-        driver.get(url)
+        self.driver.get(url)
 
         if set_location:
             wait.until(
                 EC.presence_of_element_located((By.ID, "location-dialog"))
             )
-            location_dialog = driver.find_element(By.ID, "location-dialog")
+            location_dialog = self.driver.find_element(By.ID, "location-dialog")
             if location_dialog:
                 wait.until(
                     EC.presence_of_element_located((By.CLASS_NAME, "locations-popup-location-name"))
                 )
-                # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                # os.makedirs("debug", exist_ok=True)
-                # driver.save_screenshot(f"debug/debug_{timestamp}.png")
                 list_names = location_dialog.find_elements(By.CLASS_NAME, "locations-popup-location-name")
                 for elm in list_names:
                     if elm.get_attribute("innerText").upper().find("Miami".upper()) >= 0:
@@ -213,7 +211,7 @@ class Price:
             """
 
         wait.until(lambda d: d.execute_script(script_js) is not None)
-        price_text = driver.execute_script(script_js)
+        price_text = self.driver.execute_script(script_js)
         if price_text == 'out_of_stock':
             out_of_stock = True
         else:
